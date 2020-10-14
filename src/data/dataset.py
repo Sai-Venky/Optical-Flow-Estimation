@@ -1,9 +1,8 @@
 from data.mpi_sintel import MpiSintel
-from data.util import transform
 from utils.config import opt
 
 class Dataset:
-    def __init__(self, opt):
+    def __init__(self, dataset_dir):
         self.dataset = MpiSintel(root = dataset_dir)
 
     def __getitem__(self, idx):

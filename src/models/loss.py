@@ -21,8 +21,8 @@ class MultiScale(nn.Module):
             target = self.div_flow * target
             for i, output_ in enumerate(output):
                 target_ = self.multiScales[i](target)
-                epevalue += self.loss_weights[i]*torch.norm(output-target,p=2,dim=1).mean()
-                lossvalue += self.loss_weights[i]*torch.abs(output - target).mean()
+                epevalue += self.loss_weights[i]*(torch.norm(output_ - target_,p=2,dim=1).mean())
+                lossvalue += self.loss_weights[i]*(torch.abs(output_ - target_).mean())
             return [lossvalue, epevalue]
         else:
             epevalue += torch.norm(output-target,p=2,dim=1).mean()

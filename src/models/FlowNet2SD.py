@@ -1,16 +1,15 @@
 import torch
 import torch.nn as nn
 from torch.nn import init
-import numpy as np
 
 import math
+from utils.config import opt
 
-from .submodules import *
-'Parameter count = 45,371,666'
-
-class FlowNetSD(nn.Module):
-    def __init__(self, args, batchNorm=True):
-        super(FlowNetSD,self).__init__()
+class FlowNet2SD(nn.Module):
+    def __init__(self, batchNorm=True, div_flow=20):
+        super(FlowNet2SD,self).__init__()
+        self.rgb_max = opt.rgb_max
+        self.div_flow = div_flow
 
         self.batchNorm = batchNorm
         self.conv0   = conv(self.batchNorm,  6,   64)
@@ -58,12 +57,15 @@ class FlowNetSD(nn.Module):
                 if m.bias is not None:
                     init.uniform_(m.bias)
                 init.xavier_uniform_(m.weight)
-                # init_deconv_bilinear(m.weight)
         self.upsample1 = nn.Upsample(scale_factor=4, mode='bilinear')
 
 
 
-    def forward(self, x):
+    def forward(self, inputs):
+        rgb_mean = inputs.contiguous().view(inputs.size()[:2]+(-1,)).mean(dim=-1).view(inputs.size()[:2] + (1,1,1,))
+        x = (inputs - rgb_mean) / self.rgb_max
+        x = torch.cat( (x[:,:,0,:,:], x[:,:,1,:,:]), dim = 1)
+
         out_conv0 = self.conv0(x)
         out_conv1 = self.conv1_1(self.conv1(out_conv0))
         out_conv2 = self.conv2_1(self.conv2(out_conv1))
@@ -103,7 +105,7 @@ class FlowNetSD(nn.Module):
         if self.training:
             return flow2,flow3,flow4,flow5,flow6
         else:
-            return flow2,
+            return self.upsample1(flow2*self.div_flow)
 
 def predict_flow(in_planes):
     return nn.Conv2d(in_planes,2,kernel_size=3,stride=1,padding=1,bias=True)

@@ -20,7 +20,7 @@ class Config:
     resume = 'PATH'
     log_frequency = 1
 
-    number_workers = 8
+    number_workers = 1
     number_gpus = 1
     no_cuda = True
 
@@ -42,8 +42,8 @@ class Config:
     fp16_scale = 1024.0
 
     model = 'FlowNet2S'
-    dataset_dir = './MPI-Sintel/flow'
-
+    dataset_dir = './MPI-Sintel/flow/'
+    flow_folder = './flows'
 
     def _parse(self, kwargs):
         state_dict = self._state_dict()

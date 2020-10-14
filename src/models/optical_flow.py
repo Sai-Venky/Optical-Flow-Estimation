@@ -1,18 +1,42 @@
 import os
+from os.path import *
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import numpy as np
+from tqdm import tqdm
+import time
 
 from utils.config import opt
+from data.utils import writeFlow, visulize_flow_file
 from models.loss import MultiScale
+from models.FlowNet2SD import FlowNet2SD
+
+
+class IteratorTimer():
+    def __init__(self, iterable):
+        self.iterable = iterable
+        self.iterator = self.iterable.__iter__()
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self.iterable)
+
+    def __next__(self):
+        start = time.time()
+        n = next(self.iterator)
+        self.last_duration = (time.time() - start)
+        return n
+
 
 class OpticalFlow(nn.Module):
-    def __init__(self, args):
+    def __init__(self):
         super(OpticalFlow, self).__init__()
-        self.model = model_map[opt.model]
+        self.model = FlowNet2SD()
         self.optimizer = self.get_optimizer()
         self.loss = MultiScale() 
         
@@ -42,66 +66,66 @@ class OpticalFlow(nn.Module):
         return self.optimizer
 
 
-    def train(data_loader, model, optimizer, is_validate=False, offset=0):
+    def train(self, data_loader, offset=0):
         statistics = []
         total_loss = 0
 
-        model.train()
+        self.model.train()
 
-        progress = tqdm(tools.IteratorTimer(data_loader), ncols=120, total=np.minimum(len(data_loader), opt.effective_batch_size), smoothing=.9, miniters=1, leave=True, position=offset, desc = 'training')
+        progress = tqdm(IteratorTimer(data_loader), ncols=120, total=np.minimum(len(data_loader), opt.effective_batch_size), smoothing=.9, miniters=1, leave=True, position=offset, desc = 'training')
 
         last_log_time = progress._time()
         for batch_idx, (data, target) in enumerate(progress):
 
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
 
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-            if opt.cuda and opt.number_gpus == 1:
+            if not opt.no_cuda and opt.number_gpus == 1:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
-            losses = model(data[0], target[0])
+            losses = self.forward(data[0], target[0], False)
             losses = [torch.mean(loss_value) for loss_value in losses] 
             loss_val = losses[0]
             total_loss += loss_val.item()
 
             loss_val.backward()
-
-            torch.nn.utils.clip_grad_norm(model.parameters(), opt.gradient_clip)
-
-            params = list(model.parameters())
-            for i in range(len(params)):
-                param_copy[i].grad = params[i].grad.clone().type_as(params[i]).detach()
-                param_copy[i].grad.mul_(1./opt.loss_scale)
-            optimizer.step()
-            for i in range(len(params)):
-                params[i].data.copy_(param_copy[i].data)
+                
+            self.optimizer.step()
 
         progress.close()
 
         return total_loss / float(batch_idx + 1), (batch_idx + 1)
 
 
-    def validate(data_loader, model, optimizer, is_validate=False, offset=0):
+    def validate(self, data_loader, offset=0):
         statistics = []
         total_loss = 0
 
-        model.eval()
+        self.model.eval()
 
-        progress = tqdm(tools.IteratorTimer(data_loader), ncols=100, total=np.minimum(len(data_loader), args.effective_batch_size), leave=True, position=offset, desc='Validation')
+        progress = tqdm(IteratorTimer(data_loader), ncols=100, total=np.minimum(len(data_loader), opt.effective_batch_size), leave=True, position=offset, desc='Validation')
 
         last_log_time = progress._time()
         for batch_idx, (data, target) in enumerate(progress):
 
 
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-            if opt.cuda and opt.number_gpus == 1:
+            if not opt.no_cuda and opt.number_gpus == 1:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
-            losses = model(data[0], target[0])
+            losses, output = self.forward(data[0], target[0], True)
             losses = [torch.mean(loss_value) for loss_value in losses] 
             loss_val = losses[0]
             total_loss += loss_val.item()
 
+            for i in range(opt.effective_batch_size):
+                _pflow = output[i].data.cpu().numpy().transpose(1, 2, 0)
+                writeFlow( join(opt.flow_folder, '%06d.flo'%(batch_idx * opt.effective_batch_size + i)),  _pflow)
+                
+                # You can comment out the plt block in visulize_flow_file() for real-time visualization
+                visulize_flow_file(
+                    join(opt.flow_folder, '%06d.flo' % (batch_idx * opt.effective_batch_size + i)),opt.flow_folder)
+            
 
         progress.close()
 
