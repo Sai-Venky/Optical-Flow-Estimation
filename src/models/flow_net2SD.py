@@ -6,6 +6,13 @@ import math
 from utils.config import opt
 
 class FlowNet2SD(nn.Module):
+
+    '''
+        Implements the FlowNet2SD architecture
+        This is the one of the components of the flownet 2 architecture.
+        https://arxiv.org/pdf/1612.01925.pdf
+    '''
+
     def __init__(self, batchNorm=True, div_flow=20):
         super(FlowNet2SD,self).__init__()
         self.rgb_max = opt.rgb_max

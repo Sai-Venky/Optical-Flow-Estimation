@@ -11,6 +11,12 @@ from data.utils import StaticCenterCrop, StaticRandomCrop, read_gen
 from utils.config import opt
 
 class MpiSintel(data.Dataset):
+
+    '''
+        MpiSintel class takes care of fetching the images and flow applicable for a index.
+        It also preprocess those by cropping/resizing
+    '''
+
     def __init__(self, is_cropped = False, root = '', dstype = 'final', replicates = 1):
         self.is_cropped = is_cropped
         self.crop_size = opt.crop_size
@@ -54,6 +60,7 @@ class MpiSintel(data.Dataset):
         opt.inference_size = self.render_size
 
         assert (len(self.image_list) == len(self.flow_list))
+
 
     def get_example(self, index):
 

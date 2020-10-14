@@ -3,6 +3,12 @@ import torch.nn as nn
 import math
 
 class MultiScale(nn.Module):
+
+    '''
+        Computes the loss for the model.
+        Uses L1 loss for multiscale computation
+    '''
+
     def __init__(self, startScale = 4, numScales = 5, l_weight= 0.32):
         super(MultiScale,self).__init__()
 
@@ -14,6 +20,17 @@ class MultiScale(nn.Module):
         self.multiScales = [nn.AvgPool2d(self.startScale * (2**scale), self.startScale * (2**scale)) for scale in range(self.numScales)]
 
     def forward(self, output, target):
+
+        '''
+            Computes the loss for the model.
+            Uses L1 loss for multiscale computation
+            Arguments:
+                output      :- Precited flow
+                target      :- Target flow
+            Returns:
+                lost of the loss value, epe value
+        '''
+
         lossvalue = 0
         epevalue = 0
 

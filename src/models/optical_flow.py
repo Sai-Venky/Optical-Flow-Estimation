@@ -12,28 +12,14 @@ import time
 from utils.config import opt
 from data.utils import writeFlow, visulize_flow_file
 from models.loss import MultiScale
-from models.FlowNet2SD import FlowNet2SD
-
-
-class IteratorTimer():
-    def __init__(self, iterable):
-        self.iterable = iterable
-        self.iterator = self.iterable.__iter__()
-
-    def __iter__(self):
-        return self
-
-    def __len__(self):
-        return len(self.iterable)
-
-    def __next__(self):
-        start = time.time()
-        n = next(self.iterator)
-        self.last_duration = (time.time() - start)
-        return n
-
+from models.flow_net2SD import FlowNet2SD
 
 class OpticalFlow(nn.Module):
+
+    '''
+        OpticalFlow is the base class which contains all the methods related to training, validation etc
+    '''
+
     def __init__(self):
         super(OpticalFlow, self).__init__()
         self.model = FlowNet2SD()
@@ -41,6 +27,17 @@ class OpticalFlow(nn.Module):
         self.loss = MultiScale() 
         
     def forward(self, data, target, inference=False ):
+
+        '''
+            Return the two image and flow applicable for those images
+            Arguments:
+                data        :- the images
+                target      :- the flow for the images
+            Returns:
+                loss_values :- The loss values computed between the computed and predicted flows
+                output      :- the output value from flownet model
+        '''
+                
         output = self.model(data)
 
         loss_values = self.loss(output, target)
@@ -67,6 +64,16 @@ class OpticalFlow(nn.Module):
 
 
     def train(self, data_loader, offset=0):
+
+        '''
+            Implements the train function for optical flow
+            Arguments:
+                data_loader :- Training Dataloader
+                offset      :- offset parameter passed for tqdm
+            Returns:
+                the totalloss computed over the total batch size
+        '''
+
         statistics = []
         total_loss = 0
 
@@ -80,7 +87,7 @@ class OpticalFlow(nn.Module):
             self.optimizer.zero_grad()
 
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-            if not opt.no_cuda and opt.number_gpus == 1:
+            if opt.cuda and opt.number_gpus == 1:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
             losses = self.forward(data[0], target[0], False)
@@ -98,6 +105,18 @@ class OpticalFlow(nn.Module):
 
 
     def validate(self, data_loader, offset=0):
+
+
+        '''
+            Implements the validate function for optical flow
+            There is also visualization of flow called in the same
+            Arguments:
+                data_loader :- Training Dataloader
+                offset      :- offset parameter passed for tqdm
+            Returns:
+                the totalloss computed over the total batch size
+        '''
+        
         statistics = []
         total_loss = 0
 
@@ -110,7 +129,7 @@ class OpticalFlow(nn.Module):
 
 
             data, target = [Variable(d) for d in data], [Variable(t) for t in target]
-            if not opt.no_cuda and opt.number_gpus == 1:
+            if opt.cuda and opt.number_gpus == 1:
                 data, target = [d.cuda(non_blocking=True) for d in data], [t.cuda(non_blocking=True) for t in target]
 
             losses, output = self.forward(data[0], target[0], True)
@@ -133,6 +152,15 @@ class OpticalFlow(nn.Module):
 
 
     def save(self, is_best):
+
+        '''
+            Saves the model
+            Arguments:
+                is_best :- parameter to indicate if model is best
+            Returns:
+                the path of the model where its saved
+        '''
+        
         if is_best == False:
             return
         timestr = time.strftime('%m%d%H%M')
@@ -149,3 +177,34 @@ class OpticalFlow(nn.Module):
 
         torch.save(save_dict, save_path)
         return save_path
+
+    def load(self, path):
+
+        '''
+            Loads the model
+            Arguments:
+                path :- load path
+        '''
+        
+        state_dict = torch.load(path, map_location=torch.device('cpu'))
+        self.load_state_dict(state_dict['model'])
+        self.optimizer.load_state_dict(state_dict['optimizer'])
+        opt._parse(state_dict['config'])
+        return self
+
+class IteratorTimer():
+    def __init__(self, iterable):
+        self.iterable = iterable
+        self.iterator = self.iterable.__iter__()
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self.iterable)
+
+    def __next__(self):
+        start = time.time()
+        n = next(self.iterator)
+        self.last_duration = (time.time() - start)
+        return n
