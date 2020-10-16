@@ -1,7 +1,7 @@
 # Optical-Flow-Estimation
 
 Implements Optical Flow Estimation.
-Optical Flow Estimation is done to visualize and capture the movement between images.
+Optical Flow Estimation is done to visualize and capture the movement in between images.
 This is very useful in training videos etc where 'capturing' the flow is important.
 
 The code is straightforward and easy to follow.
